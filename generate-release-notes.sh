@@ -84,12 +84,12 @@ EOF
                 chmod +x "$WORKING_QORTAL_DIR/$file"
             elif [ "${file}" = "start.sh" ]; then
                 echo "Downloading from GitHub..."
-                curl -s "https://raw.githubusercontent.com/Qortal/qortal/refs/heads/$BRANCH/tools/$file" -o "$WORKING_QORTAL_DIR/$file"
+                curl -s "https://raw.githubusercontent.com/Qortal/qortal/refs/heads/$BRANCH/$file" -o "$WORKING_QORTAL_DIR/$file"
                 echo "Making $file script executable..."
                 chmod +x "$WORKING_QORTAL_DIR/$file"
             elif [ "${file}" = "stop.sh" ]; then
                 echo "Downloading from GitHub..."
-                curl -s "https://raw.githubusercontent.com/Qortal/qortal/refs/heads/$BRANCH/tools/$file" -o "$WORKING_QORTAL_DIR/$file"
+                curl -s "https://raw.githubusercontent.com/Qortal/qortal/refs/heads/$BRANCH/$file" -o "$WORKING_QORTAL_DIR/$file"
                 echo "Making $file script executable..."
                 chmod +x "$WORKING_QORTAL_DIR/$file"
             else
