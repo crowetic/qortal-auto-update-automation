@@ -1,17 +1,114 @@
 #!/bin/bash
-
 # Check if version argument is passed
 if [ -z "$1" ]; then
     echo "Usage: $0 <VERSION>"
     exit 1
 fi
-
 VERSION="$1"
-
 # Repository and branch information
 REPO="Qortal/qortal"
 BRANCH="master"
 WORKING_QORTAL_DIR='./qortal'
+
+# 1. Check if working directory exists
+if [ ! -d "$WORKING_QORTAL_DIR" ]; then
+    echo "Error: Working directory '$WORKING_QORTAL_DIR' not found."
+    read -p "Would you like to: (1) Create a new directory here, or (2) Specify a full path? [1/2]: " choice
+    if [ "$choice" = "1" ]; then
+        mkdir -p "$WORKING_QORTAL_DIR"
+        echo "Created new directory: $WORKING_QORTAL_DIR"
+    elif [ "$choice" = "2" ]; then
+        read -p "Enter full path to working directory: " new_path
+        WORKING_QORTAL_DIR="$new_path"
+        echo "Using specified directory: $WORKING_QORTAL_DIR"
+    else
+        echo "Invalid choice. Exiting."
+        exit 1
+    fi
+fi
+
+# 2. Check for qortal.jar
+JAR_FILE="$WORKING_QORTAL_DIR/qortal.jar"
+if [ ! -f "$JAR_FILE" ]; then
+    echo "Error: $JAR_FILE not found."
+    read -p "Would you like to: (1) Compile from source, (2) Use running qortal.jar, or (3) Specify a path? [1/2/3]: " choice
+    if [ "$choice" = "1" ]; then
+        echo "Cloning repo and compiling..."
+        git clone https://github.com/Qortal/qortal.git /tmp/qortal
+        if ! command -v mvn &> /dev/null; then
+            echo "Error: Maven not found. Please install Maven and try again."
+            exit 1
+        fi
+        cd /tmp/qortal || exit
+        mvn clean package
+        cp target/qortal-*.jar "$WORKING_QORTAL_DIR/qortal.jar"
+        cd - || exit
+    elif [ "$choice" = "2" ]; then
+        if [ -f "$HOME/qortal/qortal.jar" ]; then
+            cp "$HOME/qortal/qortal.jar" "$WORKING_QORTAL_DIR/"
+            echo "Copied from $HOME/qortal/qortal.jar"
+        else
+            echo "Error: $HOME/qortal/qortal.jar not found."
+            exit 1
+        fi
+    elif [ "$choice" = "3" ]; then
+        read -p "Enter full path to qortal.jar: " jar_path
+        cp "$jar_path" "$WORKING_QORTAL_DIR/"
+        echo "Used specified path: $jar_path"
+    else
+        echo "Invalid choice. Exiting."
+        exit 1
+    fi
+fi
+
+# 3. Check for required files (settings.json, log4j2.properties, etc.)
+REQUIRED_FILES=("settings.json" "log4j2.properties" "start.sh" "stop.sh" "qort")
+for file in "${REQUIRED_FILES[@]}"; do
+    if [ ! -f "$WORKING_QORTAL_DIR/$file" ]; then
+        echo "Error: $WORKING_QORTAL_DIR/$file not found."
+        read -p "Would you like to: (1) Get files from GitHub (2) exit and copy files manually then re-run? [1/2]: " choice
+        if [ "$choice" = "1" ]; then
+            if [ "$file" = "settings.json" ]; then
+                cat <<EOF > "$WORKING_QORTAL_DIR/settings.json"
+{
+    "balanceRecorderEnabled": true,
+    "apiWhitelistEnabled": false,
+    "allowConnectionsWithOlderPeerVersions": false,
+    "apiRestricted": false
+}
+EOF
+            elif [ "${file}" = "qort" ]; then
+                echo "Downloading from GitHub..."
+                curl -s "https://raw.githubusercontent.com/Qortal/qortal/refs/heads/$BRANCH/tools/$file" -o "$WORKING_QORTAL_DIR/$file"
+                echo "Making $file script executable..."
+                chmod +x "$WORKING_QORTAL_DIR/$file"
+            elif [ "${file}" = "start.sh" ]; then
+                echo "Downloading from GitHub..."
+                curl -s "https://raw.githubusercontent.com/Qortal/qortal/refs/heads/$BRANCH/tools/$file" -o "$WORKING_QORTAL_DIR/$file"
+                echo "Making $file script executable..."
+                chmod +x "$WORKING_QORTAL_DIR/$file"
+            elif [ "${file}" = "stop.sh" ]; then
+                echo "Downloading from GitHub..."
+                curl -s "https://raw.githubusercontent.com/Qortal/qortal/refs/heads/$BRANCH/tools/$file" -o "$WORKING_QORTAL_DIR/$file"
+                echo "Making $file script executable..."
+                chmod +x "$WORKING_QORTAL_DIR/$file"
+            else
+                echo "Downloading from GitHub..."
+                curl -s "https://raw.githubusercontent.com/Qortal/qortal/refs/heads/$BRANCH/$file" -o "$WORKING_QORTAL_DIR/$file"
+            fi
+        elif [ "$choice" = "2" ]; then
+            echo "copy files manually to this location then re-run script..."
+            sleep 5 
+            exit 1
+        else
+            echo "Invalid choice. Exiting."
+            exit 1
+        fi
+    fi
+done
+
+# Continue with the rest of the script...
+# (The rest of the script remains unchanged)
 
 # Fetch the latest 100 commits
 COMMITS_JSON=$(curl -s "https://api.github.com/repos/${REPO}/commits?sha=${BRANCH}&per_page=100")
