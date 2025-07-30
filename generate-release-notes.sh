@@ -23,6 +23,7 @@ if [ ! -d "$WORKING_QORTAL_DIR" ]; then
         echo "Using specified directory: $WORKING_QORTAL_DIR"
     else
         echo "Invalid choice. Exiting."
+        read -p "Press Enter to continue..."
         exit 1
     fi
 fi
@@ -37,6 +38,8 @@ if [ ! -f "$JAR_FILE" ]; then
         git clone https://github.com/Qortal/qortal.git /tmp/qortal
         if ! command -v mvn &> /dev/null; then
             echo "Error: Maven not found. Please install Maven and try again."
+            echo "to install on Ubuntu/Debian/Mint 'sudo apt update && sudo apt install maven'"
+            read -p "Press Enter to continue..."
             exit 1
         fi
         cd /tmp/qortal || exit
@@ -48,7 +51,8 @@ if [ ! -f "$JAR_FILE" ]; then
             cp "$HOME/qortal/qortal.jar" "$WORKING_QORTAL_DIR/"
             echo "Copied from $HOME/qortal/qortal.jar"
         else
-            echo "Error: $HOME/qortal/qortal.jar not found."
+            echo "Error: $HOME/qortal/qortal.jar not found. Please try running release notes script again..."
+            read -p "Press Enter to continue..."
             exit 1
         fi
     elif [ "$choice" = "3" ]; then
@@ -97,18 +101,15 @@ EOF
                 curl -s "https://raw.githubusercontent.com/Qortal/qortal/refs/heads/$BRANCH/$file" -o "$WORKING_QORTAL_DIR/$file"
             fi
         elif [ "$choice" = "2" ]; then
-            echo "copy files manually to this location then re-run script..."
-            sleep 5 
+            echo "copy '${REQUIRED_FILES}' manually to '${PWD}' then re-run script..."
+            read -p "Press Enter to continue..."
             exit 1
         else
-            echo "Invalid choice. Exiting."
+            read -p "Choice '${choice}' is INVALID... Please try running release notes script again... Press Enter to continue..."
             exit 1
         fi
     fi
 done
-
-# Continue with the rest of the script...
-# (The rest of the script remains unchanged)
 
 # Fetch the latest 100 commits
 COMMITS_JSON=$(curl -s "https://api.github.com/repos/${REPO}/commits?sha=${BRANCH}&per_page=100")
@@ -121,6 +122,7 @@ PREV_BUMP_COMMIT=$(echo "$BUMP_COMMITS" | sed -n '2p')
 
 if [ -z "$CURRENT_BUMP_COMMIT" ]; then
     echo "Error: Could not find bump commit for version ${VERSION} in ${REPO}/${BRANCH}"
+    read -p "Press Enter to continue..."
     exit 1
 fi
 
@@ -134,6 +136,7 @@ COMMIT_TIMESTAMP=$(curl -s "${COMMIT_API_URL}" | jq -r '.[0].commit.committer.da
 
 if [ -z "${COMMIT_TIMESTAMP}" ] || [ "${COMMIT_TIMESTAMP}" == "null" ]; then
     echo "Error: Unable to retrieve the latest commit timestamp from GitHub API."
+    read -p "Press Enter to continue..."
     exit 1
 fi
 
@@ -158,21 +161,64 @@ if [ -f "${JAR_FILE}" ]; then
     JAR_SHA1=${SHA1}
     JAR_SHA256=${SHA256}
 else
-    echo "Error: ${JAR_FILE} not found."
+    echo "Error: ${JAR_FILE} not found. Please ensure '${JAR_FILE}' is in '${QORKING_QORTAL_DIR}' and run release notes script again..."
+    read -p "Press Enter to continue..."
     exit 1
 fi
 
 # Hashes for qortal.exe
-if [ -f "${EXE_FILE}" ]; then
-    calculate_hashes "${EXE_FILE}"
+process_exe_file() {
+    calculate_hashes "${EXE_FILE}" || { echo "Hash calculation failed"; exit 1; }
     EXE_MD5=${MD5}
     EXE_SHA1=${SHA1}
     EXE_SHA256=${SHA256}
+}
+
+if [ -f "${EXE_FILE}" ]; then
+    process_exe_file
 else
-    echo "Warning: ${EXE_FILE} not found. Skipping."
-    EXE_MD5="<INPUT>"
-    EXE_SHA1="<INPUT>"
-    EXE_SHA256="<INPUT>"
+    echo "Warning: ${EXE_FILE} not found. RESOLUTION PENDING..."
+    read -p "Would you like to: (1) Copy Files into '${PWD}' manually ...OR... (2) Input download location (https)? [1/2]: " choice
+    if [ "$choice" = "1" ]; then
+        read -p "press 1 when copying is complete..." confirm_copy
+        if [ "$confirm_copy" = "1" ]; then
+            if [ -f "${EXE_FILE}" ]; then
+                echo "File found, using ${EXE_FILE}"
+                process_exe_file
+            else 
+                echo "Manual copy of ${EXE_FILE} FAILED... please check the file and try again"
+                sleep 10 
+                exit 1
+            fi
+        fi
+    elif [ "$choice" = "2" ]; then
+        command -v curl >/dev/null 2>&1 || { echo "Error: curl is required. Install curl and run release notes script again..."; exit 1; }
+        echo "Please input download url"
+        read -p "copy entire download url including 'https://' to publicly accessible DIRECT download for '${EXE_FILE}' for Windows installer version ${VERSION}" url
+        
+        if [ -n "${url}" ]; then
+            echo "Downloading ${EXE_FILE} from '${url}'... PLEASE WAIT..."
+            curl -L -o "${EXE_FILE}" "${url}"
+            sleep 3
+            if [ -f "${EXE_FILE}" ]; then
+                echo "File Downloaded SUCCESSFULLY... using new file..."
+                process_exe_file
+            else
+            echo "Download FAILED, please place ${EXE_FILE} into '${PWD}' and run release note script again..."
+            read -p "Press Enter to continue..."
+            exit 1
+            fi
+        else 
+            echo "Nothing input into '${url}', please manually obtain ${EXE_FILE} and copy into '${PWD}' and run release note script again..."
+            read -p "Press Enter to continue..." 
+            exit 1
+        fi
+                    
+    else
+        echo "Invalid choice. Exiting. If you would like to continue, '${EXE_FILE}' must exist, place it into '${PWD}' and run release note script again..."
+        read -p "Press Enter to continue..."
+        exit 1
+    fi
 fi
 
 # Apply commit timestamp to files in qortal/
@@ -186,6 +232,7 @@ echo "Packing ${ZIP_FILE}..."
 7z a -r -tzip "${ZIP_FILE}" ${WORKING_QORTAL_DIR}/ -stl
 if [ $? -ne 0 ]; then
     echo "Error: Failed to create ${ZIP_FILE}."
+    read -p "Press Enter to continue..."
     exit 1
 fi
 
@@ -235,4 +282,3 @@ Packed with \`7z a -r -tzip qortal.zip qortal/\`
 EOF
 
 echo "Release notes generated: release-notes.txt"
-
